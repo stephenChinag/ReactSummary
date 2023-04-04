@@ -11,7 +11,7 @@ const Search = React.memo((props) => {
 		setEnteredValue(event.target.value);
 	};
 	useEffect(() => {
-		setTimeout(() => {
+		const timer = setTimeout(() => {
 			if (enteredValue === inputRef.current.value) {
 				const query =
 					enteredValue.length === 0
@@ -40,6 +40,7 @@ const Search = React.memo((props) => {
 				};
 				fetchData();
 			}
+			return clearTimeout(timer);
 		}, 0);
 	}, [enteredValue, onLoadIngredients, inputRef]);
 	return (
