@@ -1,8 +1,10 @@
-import React, { useCallback, useReducer } from "react";
+import React, { useCallback, useContext, useReducer } from "react";
 import ErrorModal from "../UI/ErrorModal";
 import IngredientForm from "./IngredientForm";
 import IngredientList from "./IngredientList";
 import Search from "./Search";
+import { AuthContext } from "../../context/auth-context";
+
 const ingredientReducer = (currentIngredient, action) => {
 	switch (action.type) {
 		case "SET":
@@ -31,12 +33,15 @@ const httpReducer = (currHttpState, action) => {
 	}
 };
 function Ingredients() {
+	const authContex = useContext(AuthContext);
 	const [userIngredient, dispatch] = useReducer(ingredientReducer, []);
 	const [httpState, dispatchHttp] = useReducer(httpReducer, {
 		loading: false,
 		error: null,
 	});
-
+	const isLogOutHandler = () => {
+		authContex.login(false);
+	};
 	const SearchedIngredient = useCallback((searchIngred) => {
 		dispatch({ type: "SET", ingredients: searchIngred });
 	}, []);
@@ -119,6 +124,7 @@ function Ingredients() {
 					onRemoveItem={removeIngredient}
 				/>
 			</section>
+			<button onClick={isLogOutHandler}> LougOut</button>
 		</div>
 	);
 }
