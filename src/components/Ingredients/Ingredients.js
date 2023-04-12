@@ -1,9 +1,16 @@
-import React, { useCallback, useContext, useReducer } from "react";
+import React, {
+	useCallback,
+	useContext,
+	useEffect,
+	useMemo,
+	useReducer,
+} from "react";
 import ErrorModal from "../UI/ErrorModal";
 import IngredientForm from "./IngredientForm";
 import IngredientList from "./IngredientList";
 import Search from "./Search";
 import { AuthContext } from "../../context/auth-context";
+import useHttp from "../hooks/http";
 
 const ingredientReducer = (currentIngredient, action) => {
 	switch (action.type) {
@@ -18,27 +25,12 @@ const ingredientReducer = (currentIngredient, action) => {
 	}
 };
 
-const httpReducer = (currHttpState, action) => {
-	switch (action.type) {
-		case "SEND":
-			return { loading: true, error: null };
-		case "RESPONSE":
-			return { ...currHttpState, loading: false };
-		case "ERROR":
-			return { loading: false, error: action.errorData };
-		case "CLEAR":
-			return { ...currHttpState, error: null };
-		default:
-			throw new Error("Should not be reached");
-	}
-};
 function Ingredients() {
 	const authContex = useContext(AuthContext);
 	const [userIngredient, dispatch] = useReducer(ingredientReducer, []);
-	const [httpState, dispatchHttp] = useReducer(httpReducer, {
-		loading: false,
-		error: null,
-	});
+	const { data, isLoading, error, sendRequest, extra, reqIdentifier, clear } =
+		useHttp();
+
 	const isLogOutHandler = () => {
 		authContex.login(false);
 	};
@@ -46,83 +38,63 @@ function Ingredients() {
 		dispatch({ type: "SET", ingredients: searchIngred });
 	}, []);
 
-	async function getEnteredUserIngredient(ingredient) {
-		// setIsLoading(true);
-		dispatchHttp({ type: "SEND" });
-		const response = await fetch(
-			"https://react-hook-summary-8c475-default-rtdb.firebaseio.com/ingredients.json",
-			{
-				method: "POST",
-				body: JSON.stringify(ingredient),
-				headers: {
-					"Content-Type": "application/json",
-				},
-			},
-		);
-		if (!response.ok) {
-			<p> Sorry Something went Wrong</p>;
-		} else {
-			dispatchHttp({ type: "RESPONSE" });
-			const getRest = await response.json();
-
+	useEffect(() => {
+		if (!isLoading && !error && reqIdentifier === "REMOVE_INGREDIENT") {
+			dispatch({ type: "DELETE", id: extra });
+		} else if (!isLoading && !error && reqIdentifier === "ADD_INGREDIENT") {
 			dispatch({
 				type: "ADD",
-				ingredient: { id: getRest.name, ...ingredient },
+				ingredient: { id: data.name, ...extra },
 			});
 		}
-	}
+	}, [data, extra, reqIdentifier, isLoading, error]);
 
-	const removeIngredient = async (ingredientId) => {
-		// setIsLoading(true);
-		dispatchHttp({ type: "SEND" });
-
-		try {
-			const response = await fetch(
-				`https://react-hook-summary-8c475-default-rtdb.firebaseio.com/ingredients/${ingredientId}.json`,
-				{
-					method: "DELETE",
-				},
+	const addIngredientHandler = useCallback(
+		(ingredient) => {
+			sendRequest(
+				"https://react-hook-summary-8c475-default-rtdb.firebaseio.com/ingredients.json",
+				"POST",
+				JSON.stringify(ingredient),
+				ingredient,
+				"ADD_INGREDIENT",
 			);
-			if (!response.ok) {
-				console.log("Something went Wrong");
-			}
-			// console.log(response);
-		} catch (err) {
-			dispatchHttp({ type: "ERROR", errorData: "Something went 	Wrond" });
-			return;
-		}
-
-		// if (!response.ok) {
-		// 	setError("Something Went Wrong");
-		// }
-		// setIsLoading(false);
-		dispatchHttp({ type: "RESPONSE" });
-
-		// 	setUserIngredient((prev) =>
-		// 		prev.filter((ingredient) => ingredient.id !== ingredientId),
-		// 	);
-
-		dispatch({ type: "DELETE", id: ingredientId });
-	};
-	const clearError = () => {
-		dispatchHttp({ type: "CLEAR" });
-	};
+		},
+		[sendRequest],
+	);
+	const removeIngredient = useCallback(
+		async (ingredientId) => {
+			sendRequest(
+				`https://react-hook-summary-8c475-default-rtdb.firebaseio.com/ingredients/${ingredientId}.json`,
+				"DELETE",
+				null,
+				ingredientId,
+				"REMOVE_INGREDIENT",
+			);
+		},
+		[sendRequest],
+	);
+	const clearError = useCallback(() => {
+		clear();
+	}, [clear]);
+	const ingredientList = useMemo(() => {
+		return (
+			<IngredientList
+				ingredients={userIngredient}
+				onRemoveItem={removeIngredient}
+			/>
+		);
+	}, [userIngredient, removeIngredient]);
 	return (
 		<div className="App">
-			{httpState.error && (
-				<ErrorModal onClose={clearError}> {httpState.error}</ErrorModal>
-			)}
+			{error && <ErrorModal onClose={clearError}> {error}</ErrorModal>}
 			<IngredientForm
-				onAddIngredent={getEnteredUserIngredient}
-				loading={httpState.loading}
+				onAddIngredent={addIngredientHandler}
+				loading={isLoading}
 			/>
 
 			<section>
 				<Search onLoadIngredients={SearchedIngredient} />
-				<IngredientList
-					ingredients={userIngredient}
-					onRemoveItem={removeIngredient}
-				/>
+				{ingredientList}
 			</section>
 			<button onClick={isLogOutHandler}> LougOut</button>
 		</div>

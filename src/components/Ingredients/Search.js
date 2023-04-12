@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-
+import useHttp from "../hooks/http";
 import Card from "../UI/Card";
+import ErrorModal from "../UI/ErrorModal";
 import "./Search.css";
 
 const Search = React.memo((props) => {
 	const [enteredValue, setEnteredValue] = useState("");
+	const { isLoading, data, error, sendRequest, clear } = useHttp();
 	const inputRef = useRef();
 	const { onLoadIngredients } = props;
 	const onChangeHandler = (event) => {
@@ -19,35 +21,39 @@ const Search = React.memo((props) => {
 						: `?orderBy="title"&equalTo="${enteredValue}"`;
 
 				const fetchData = async () => {
-					const response = await fetch(
+					sendRequest(
 						"https://react-hook-summary-8c475-default-rtdb.firebaseio.com/ingredients.json" +
 							query,
+						"GET",
 					);
-					if (!response.ok) {
-						return console.log("null");
-					}
-					const responseData = await response.json();
-					const loadedadata = [];
-					for (const key in responseData) {
-						loadedadata.push({
-							id: key,
-							title: responseData[key].title,
-							amount: responseData[key].amount,
-						});
-						// console.log(loadedadata);
-						onLoadIngredients(loadedadata);
-					}
 				};
 				fetchData();
 			}
 			return clearTimeout(timer);
 		}, 0);
-	}, [enteredValue, onLoadIngredients, inputRef]);
+	}, [enteredValue, inputRef, sendRequest]);
+
+	useEffect(() => {
+		if (!isLoading && !error && data) {
+			const loadedadata = [];
+			for (const key in data) {
+				loadedadata.push({
+					id: key,
+					title: data[key].title,
+					amount: data[key].amount,
+				});
+				// console.log(loadedadata);
+				onLoadIngredients(loadedadata);
+			}
+		}
+	}, [data, isLoading, error, onLoadIngredients]);
 	return (
 		<section className="search">
+			{error && <ErrorModal onClose={clear}>{error}</ErrorModal>}
 			<Card>
 				<div className="search-input">
 					<label>Filter by Title</label>
+					{isLoading && <span> Loading....</span>}
 					<input
 						type="text"
 						ref={inputRef}
